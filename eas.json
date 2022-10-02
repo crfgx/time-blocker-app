@@ -1,0 +1,24 @@
+{
+  "cli": {
+    "version": ">= 0.57.0"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal"
+    },
+    "preview": {
+      "distribution": "internal"
+    },
+    "production": {}
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "appleId": "cagirtas@gmail.com",
+        "ascAppId": "1638867799",
+        "appleTeamId": "FDH6MWPL9X"
+      }
+    }
+  }
+}

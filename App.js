@@ -1,37 +1,41 @@
 import { StatusBar } from "expo-status-bar";
 import React, { useEffect, useState } from "react";
-import { Button, StyleSheet, Text, View, TextInput } from "react-native";
+import { useKeepAwake } from "expo-keep-awake";
+import {
+  StyleSheet,
+  Text,
+  View,
+  TextInput,
+  Pressable,
+  Image,
+} from "react-native";
 import { useFonts } from "expo-font";
 import * as Google from "expo-auth-session/providers/google";
 import * as WebBrowser from "expo-web-browser";
-import Ionicons from "@expo/vector-icons/Ionicons";
+import BackgroundTimer from "react-native-background-timer";
+import "expo-dev-client";
 
 WebBrowser.maybeCompleteAuthSession();
 
 export default function App() {
   const [accessToken, setAccessToken] = useState();
+  console.log(accessToken ? "accessToken true" : "accessToken false");
   const [userInfo, setUserInfo] = useState();
   const [summary, setSummary] = useState();
   console.log(summary ? summary : "no summary setted");
   const [remainTime, setRemainTime] = useState();
   const [trigger, setTrigger] = useState();
   const [calendar, setCalendar] = useState();
-  console.log(remainTime ? "true" : "false");
-  const [newHour, setNewHour] = useState();
-  const [newMin, setNewMin] = useState();
+  const [endHour, setEndHour] = useState();
+  const [endMin, setEndMin] = useState();
   const [connected, setConnected] = useState();
   /*   console.log(userInfo ? "logged in" : "no login");
   console.log(remainTime ? remainTime : "remain time not setted");
   console.log("new hour:" + newHour);
   console.log("new min:" + newMin); */
 
-  //when keyboard open slide input area up
-  //if phone connected internet
-  //when screen closed keep Timer
-  //if screen closed and timer topped send notification
-  //put button for arrange screen lock for selected time
-  //check styles for android
-  //nasil release oluyor ogren
+  //accessToken i storage a yazsin
+  //remaintime 0 olunca notifikasyon gondersin
 
   const currentDate = new Date().toISOString();
   console.log("current date:" + currentDate);
@@ -40,7 +44,7 @@ export default function App() {
   const trimDate2 = currentDate.slice(16, 25);
   const currentHours = date.getHours() - 3;
   const currentMinutes = date.getMinutes();
-  const endTime = trimDate1 + newHour + ":" + newMin + trimDate2;
+  const endTime = trimDate1 + endHour + ":" + endMin + trimDate2;
   console.log("end date:" + endTime);
 
   const resetAll = () => {
@@ -49,8 +53,8 @@ export default function App() {
     setConnected();
     setSummary();
     setRemainTime();
-    setNewHour();
-    setNewMin();
+    setEndHour();
+    setEndMin();
     console.log("reseted");
   };
 
@@ -58,8 +62,8 @@ export default function App() {
     setCalendar();
     setTrigger();
     setRemainTime();
-    setNewHour();
-    setNewMin();
+    setEndHour();
+    setEndMin();
     console.log("reseted");
   };
 
@@ -73,22 +77,27 @@ export default function App() {
     scopes: ["https://www.googleapis.com/auth/calendar"],
   });
 
+  useKeepAwake();
+
   //get accessToken from Google
-  useEffect(async () => {
-    if (response?.type === "success") {
-      setAccessToken(response.authentication.accessToken);
-      if (accessToken) {
-        let userInfoResponse = await fetch(
-          "https://www.googleapis.com/userinfo/v2/me",
-          {
-            headers: { Authorization: `Bearer ${accessToken}` },
-          }
-        );
-        userInfoResponse.json().then((data) => {
-          setUserInfo(data);
-        });
+  useEffect(() => {
+    async function fetchData() {
+      if (response?.type === "success") {
+        setAccessToken(response.authentication.accessToken);
+        if (accessToken) {
+          let userInfoResponse = await fetch(
+            "https://www.googleapis.com/userinfo/v2/me",
+            {
+              headers: { Authorization: `Bearer ${accessToken}` },
+            }
+          );
+          userInfoResponse.json().then((data) => {
+            setUserInfo(data);
+          });
+        }
       }
     }
+    fetchData();
   }, [response, accessToken]);
 
   //click to signin to Google
@@ -96,55 +105,75 @@ export default function App() {
     return (
       <>
         <View>
-          <Button
-            title={accessToken ? "" : "Login Google"}
+          <Pressable
+            style={styles.button}
+            disabled={userInfo ? true : false}
             onPress={() => {
               promptAsync();
             }}
-            disabled={userInfo ? true : false}
-          />
-          <Text style={styles.text}>{userInfo ? userInfo.name : null}</Text>
+          >
+            <Text style={styles.buttonText}>
+              {userInfo ? "" : "Login Google"}
+            </Text>
+          </Pressable>
+          <Text style={styles.smallText}>
+            {userInfo ? userInfo.email : null}
+          </Text>
+          <Pressable
+            style={styles.button}
+            disabled={accessToken == null ? true : false}
+            onPress={() => setUserInfo()}
+          >
+            <Text style={styles.buttonText}>
+              {userInfo == null ? "" : "Logout"}
+            </Text>
+          </Pressable>
+          {/*           <Pressable style={styles.button} onPress={""}>
+            <Text style={styles.buttonText}>getLocalValue</Text>
+          </Pressable> */}
         </View>
       </>
     );
   };
 
-  useEffect(async () => {
-    if (calendar && userInfo && summary) {
-      let userCalendarResponse = await fetch(
-        `https://www.googleapis.com/calendar/v3/calendars/${userInfo.email}/events`,
-        {
-          method: "POST",
-          headers: { Authorization: `Bearer ${accessToken}` },
-          body: JSON.stringify({
-            summary: summary,
-            end: {
-              dateTime: endTime,
-            },
-            start: {
-              dateTime: currentDate,
-            },
-          }),
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        if (calendar && userInfo && summary) {
+          let userCalendarResponse = await fetch(
+            `https://www.googleapis.com/calendar/v3/calendars/${userInfo.email}/events`,
+            {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${accessToken}`,
+                "Content-Type": "application/x-www-form-urlencoded",
+                Accept: "application/json",
+              },
+              body: JSON.stringify({
+                summary: summary,
+                end: {
+                  dateTime: endTime,
+                },
+                start: {
+                  dateTime: currentDate,
+                },
+              }),
+            }
+          );
+          userCalendarResponse.json().then((data) => {
+            console.log(data);
+            if (data.status === "confirmed") {
+              console.log("sent end date:" + data);
+              setConnected(true);
+            }
+          });
         }
-      );
-      userCalendarResponse.json().then((data) => {
-        console.log(data);
-        if (data.status === "confirmed") {
-          console.log("sent end date:" + data);
-          setConnected(true);
-        }
-      });
-    } else console.log("Failed to Send");
+      } catch (error) {
+        console.log(error);
+      }
+    }
+    fetchData();
   }, [calendar, userInfo]);
-
-  //font load
-  const [font] = useFonts({
-    Orbitron: require("./assets/orbitron-regular.ttf"),
-  });
-
-  if (!font) {
-    return null;
-  }
 
   //Quotes later
   /*   const Quotes = () => {
@@ -165,14 +194,14 @@ export default function App() {
 
   const calculateEndTime = () => {
     if (currentMinutes + remainTime > 59) {
-      setNewHour(currentHours + 1);
-      setNewMin(currentMinutes + remainTime - 60);
+      setEndHour(currentHours + 1);
+      setEndMin(currentMinutes + remainTime - 60);
     } else {
-      setNewHour(currentHours);
-      setNewMin(currentMinutes + remainTime);
+      setEndHour(currentHours);
+      setEndMin(currentMinutes + remainTime);
     }
-    if (newMin < 10) {
-      return setNewMin(String(newMin).padStart(2, 0));
+    if (endMin < 10) {
+      return setEndMin(String(endMin).padStart(2, 0));
     }
   };
 
@@ -194,7 +223,7 @@ export default function App() {
     }, [trigger]);
 
     useEffect(() => {
-      const interval = setInterval(() => {
+      const interval = BackgroundTimer.setInterval(() => {
         if (seconds === 0) {
           if (minutes !== 0) {
             setMinutes(minutes - 1);
@@ -205,54 +234,62 @@ export default function App() {
         }
       }, 1000);
       //needs a cleanup function
-      return () => clearInterval(interval);
+      return () => BackgroundTimer.clearInterval(interval);
     }, [seconds]);
-    /*     const increaseMinutes = (props) => {
-      setSeconds(59);
-      setMinutes(props + 1);
-    };
-
-    const decreaseMinutes = (props) => {
-      if (props >= 1) {
-        setSeconds(59);
-        setMinutes(props - 1);
-      } else return;
-    }; */
 
     //make seconds double numeric
     const Seconds = (props) => {
       return String(props.second).padStart(2, "0");
     };
+    const [customTime, setCustomTime] = useState("");
 
     return (
       <>
         <View style={styles.row}>
-          <Button
-            title="30 min"
+          <TextInput
+            style={styles.buttonText}
+            placeholder="Custom "
+            placeholderTextColor="#0079ff"
+            keyboardType="number-pad"
+            maxLength={2}
+            returnKeyType={"done"}
+            onChangeText={setCustomTime}
+            onSubmitEditing={() => {
+              resetTimer();
+              setRemainTime(Number(customTime));
+              setTrigger(true);
+            }}
+          ></TextInput>
+          <Pressable
+            style={styles.button}
             onPress={() => {
               resetTimer();
               setRemainTime(30);
               setTrigger(true);
             }}
-          />
-          <Button
-            title="45 min"
+          >
+            <Text style={styles.buttonText}>30 min</Text>
+          </Pressable>
+          <Pressable
+            style={styles.button}
             onPress={() => {
               resetTimer();
               setRemainTime(45);
               setTrigger(true);
             }}
-          />
-          <Button
-            title="60 min"
+          >
+            <Text style={styles.buttonText}>45 min</Text>
+          </Pressable>
+          <Pressable
+            style={styles.button}
             onPress={() => {
               resetTimer();
               setRemainTime(60);
               setTrigger(true);
             }}
-          />
-          {/*           <Button title="-" onPress={() => decreaseMinutes(minutes)} />
-          <Button title="+" onPress={() => increaseMinutes(minutes)} /> */}
+          >
+            <Text style={styles.buttonText}>60 min</Text>
+          </Pressable>
         </View>
         <View style={styles.row}>
           <Text style={styles.countdown}>
@@ -261,21 +298,62 @@ export default function App() {
             <Seconds second={seconds} />
           </Text>
         </View>
-        <Button title="Reset" onPress={() => resetAll()} />
+        <Pressable style={styles.button} onPress={() => resetAll()}>
+          <Text style={styles.buttonText}>Reset</Text>
+        </Pressable>
       </>
     );
   };
 
+  const OnBoarding = () => {
+    /*     const [keyboardStatus, setKeyboardStatus] = useState("");
+
+    const _keyboardDidShow = () => setKeyboardStatus("Keyboard Shown");
+    //keyboard focus olursa yapalim bunu mesela
+    useEffect(() => {
+      Keyboard.addListener("keyboardDidShow", _keyboardDidShow);
+
+      // cleanup function
+      return () => {
+        Keyboard.removeListener("keyboardDidShow", _keyboardDidShow);
+      };
+    }, []); */
+
+    if (!summary) {
+      return (
+        <>
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "center",
+              alignItems: "space-between",
+            }}
+          >
+            <Text style={styles.smallText}>Enter Your Text Below</Text>
+            <Image
+              style={{
+                width: 20,
+                height: 20,
+                marginLeft: 10,
+              }}
+              source={require("./assets/arrow.gif")}
+            />
+          </View>
+        </>
+      );
+    } else return null;
+  };
+
   const Input = () => {
     const [input, setInput] = useState("");
-
     return (
       <>
-        <View style={{ flexDirection: "column" }}>
+        <View style={styles.inputFrame}>
           <TextInput
-            style={styles.text}
-            placeholder={summary ? summary : "Doing What Now?"}
-            placeholderTextColor="#17d4fe"
+            style={styles.inputLine}
+            placeholder={summary ? summary : "What Are You Doing?"}
+            placeholderTextColor="#17D4FE"
+            maxLength={40}
             keyboardType="default"
             returnKeyType={"done"}
             value={input}
@@ -292,32 +370,46 @@ export default function App() {
   const CheckSteps = () => {
     if (!accessToken) {
       return (
-        <Text style={styles.text}>
-          Login to Send Time Data to Your Calendar{" "}
-        </Text>
+        <View style={styles.infoBar}>
+          <Text style={styles.smallText}>
+            Login to Send Time Data to Your Calendar{" "}
+          </Text>
+        </View>
       );
     }
     if (!summary) {
       return (
-        <Text style={styles.text}>
-          {summary ? "Select Time" : "Enter What Are You Doing Now"}
-        </Text>
+        <View style={styles.infoBar}>
+          <Text style={styles.smallText}>
+            {summary ? "Select Time" : "First Enter Your Task Name"}
+          </Text>
+        </View>
       );
     }
     return (
-      <Text style={styles.text}>
-        {connected ? "Success, Check Calendar" : "Now Select Timer"}
-      </Text>
+      <View style={styles.infoBar}>
+        <Text style={styles.smallText}>
+          {connected ? "Success, Check Calendar" : "Now Must Select Timer"}
+        </Text>
+      </View>
     );
   };
+
+  const [font] = useFonts({
+    Orbitron: require("./assets/orbitron-regular.ttf"),
+  });
+
+  if (!font) {
+    return null;
+  }
 
   return (
     <View style={styles.container}>
       <StatusBar style="auto" />
-      <CheckSteps />
-      {/*       <Quotes /> */}
-      <CountDown />
+      <OnBoarding />
       <Input />
+      <CountDown />
+      <CheckSteps />
       <GoogleSign />
     </View>
   );
@@ -342,14 +434,50 @@ const styles = StyleSheet.create({
     letterSpacing: 7,
   },
   text: {
-    color: "#17d4fe",
+    color: "#17D4FE",
     fontSize: 20,
-    fontFamily: "Helvetica",
     letterSpacing: 7,
     justifyContent: "center",
     alignItems: "center",
     textAlign: "center",
-    marginBottom: 40,
     margin: 20,
+  },
+  smallText: {
+    color: "#17D4FE",
+    fontSize: 15,
+    justifyContent: "center",
+    alignItems: "center",
+    textAlign: "center",
+  },
+  button: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+  },
+  buttonText: {
+    color: "#0079ff",
+    fontSize: 20,
+  },
+  inputArea: {
+    width: "135%",
+  },
+  inputFrame: {
+    /*     backgroundColor: "#111111", */
+    padding: 7,
+    margin: 10,
+  },
+  infoBar: {
+    /*     backgroundColor: "#111111", */
+    margin: 10,
+    padding: 7,
+  },
+  inputLine: {
+    color: "#17D4FE",
+    fontSize: 20,
+    letterSpacing: 7,
+    justifyContent: "center",
+    alignItems: "center",
+    textAlign: "center",
   },
 });

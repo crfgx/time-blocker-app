@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "pomo",
+    "name": "Time Blocker GX",
     "slug": "pomo",
     "version": "1.0.0",
     "orientation": "default",
@@ -13,20 +13,28 @@
     "updates": {
       "fallbackToCacheTimeout": 0
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "pomo",
-      "buildNumber": "1.0.0"
+      "bundleIdentifier": "com.timeblockergx",
+      "buildNumber": "2"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#FFFFFF"
-      }
+      },
+      "package": "com.timeblockergx"
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "a25e668e-e5c3-4227-8fec-84b6a8d2b66d"
+      }
     }
   }
 }
